@@ -70,7 +70,10 @@ export default async function OneRMPage() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <form action={initializeBasicExercises}>
+                            <form action={async () => {
+                                'use server';
+                                await initializeBasicExercises();
+                            }}>
                                 <Button type="submit" size="lg" className="w-full">
                                     Inicializar Ejercicios Básicos
                                 </Button>

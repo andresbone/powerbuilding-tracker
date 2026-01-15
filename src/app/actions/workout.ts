@@ -147,3 +147,55 @@ export async function finishWorkout(
         };
     }
 }
+
+/**
+ * Deletes a workout log and all associated set logs
+ */
+export async function deleteWorkout(workoutId: string) {
+    const supabase = await createServerClient();
+
+    // Check authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+        return { error: 'You must be logged in to delete workouts' };
+    }
+
+    try {
+        // Verify ownership before deleting
+        const { data: workout, error: fetchError } = await supabase
+            .from('workout_logs')
+            .select('user_id')
+            .eq('id', workoutId)
+            .single();
+
+        if (fetchError || !workout) {
+            return { error: 'Workout not found' };
+        }
+
+        if (workout.user_id !== user.id) {
+            return { error: 'You do not have permission to delete this workout' };
+        }
+
+        // Delete the workout (set_logs will be deleted automatically via CASCADE)
+        const { error: deleteError } = await supabase
+            .from('workout_logs')
+            .delete()
+            .eq('id', workoutId);
+
+        if (deleteError) {
+            throw new Error(`Failed to delete workout: ${deleteError.message}`);
+        }
+
+        // Revalidate history page
+        revalidatePath('/dashboard/history');
+
+        return { success: true };
+
+    } catch (error: any) {
+        console.error('Error deleting workout:', error);
+        return {
+            error: error.message || 'Failed to delete workout. Please try again.'
+        };
+    }
+}

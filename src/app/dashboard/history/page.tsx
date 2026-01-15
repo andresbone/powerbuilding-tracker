@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { DeleteWorkoutButton } from '@/components/delete-workout-button';
 
 interface WorkoutLogWithDetails {
     id: string;
@@ -175,8 +176,8 @@ export default async function HistoryPage() {
                             return (
                                 <Card key={log.id}>
                                     <CardHeader>
-                                        <div className="flex items-start justify-between">
-                                            <div>
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="flex-1">
                                                 <CardTitle className="text-xl">
                                                     {log.workout_templates?.name || 'Entrenamiento Libre'}
                                                 </CardTitle>
@@ -184,12 +185,18 @@ export default async function HistoryPage() {
                                                     {relativeDate} • {duration}
                                                 </CardDescription>
                                             </div>
-                                            {log.workout_templates && (
-                                                <div className="text-right text-sm text-muted-foreground">
-                                                    <div>Semana {log.workout_templates.week_num}</div>
-                                                    <div>Día {log.workout_templates.day_num}</div>
-                                                </div>
-                                            )}
+                                            <div className="flex items-start gap-2">
+                                                {log.workout_templates && (
+                                                    <div className="text-right text-sm text-muted-foreground">
+                                                        <div>Semana {log.workout_templates.week_num}</div>
+                                                        <div>Día {log.workout_templates.day_num}</div>
+                                                    </div>
+                                                )}
+                                                <DeleteWorkoutButton
+                                                    workoutId={log.id}
+                                                    workoutName={log.workout_templates?.name || 'Entrenamiento Libre'}
+                                                />
+                                            </div>
                                         </div>
                                     </CardHeader>
                                     <CardContent>

@@ -3,6 +3,12 @@ import { redirect } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
+import { VolumeChart } from '@/components/dashboard/volume-chart';
+
+interface VolumeData {
+    name: string;
+    total: number;
+}
 
 export default async function DashboardPage() {
     const supabase = await createServerClient();
@@ -11,6 +17,50 @@ export default async function DashboardPage() {
     if (!user) {
         redirect('/login');
     }
+
+    // Fetch workout logs with set_logs and templates for volume calculation
+    const { data: workoutLogs } = await supabase
+        .from('workout_logs')
+        .select(`
+            id,
+            workout_templates (
+                week_num
+            ),
+            set_logs (
+                weight_kg,
+                reps_performed
+            )
+        `)
+        .eq('user_id', user.id);
+
+    // Calculate weekly volume
+    const weeklyVolumeMap = new Map<number, number>();
+
+    workoutLogs?.forEach((log: any) => {
+        const weekNum = log.workout_templates?.week_num;
+        if (!weekNum) return;
+
+        // Calculate volume for this workout
+        const workoutVolume = log.set_logs?.reduce((sum: number, set: any) => {
+            return sum + (set.weight_kg * set.reps_performed);
+        }, 0) || 0;
+
+        // Add to weekly total
+        const currentTotal = weeklyVolumeMap.get(weekNum) || 0;
+        weeklyVolumeMap.set(weekNum, currentTotal + workoutVolume);
+    });
+
+    // Convert to array and sort by week
+    const volumeData: VolumeData[] = Array.from(weeklyVolumeMap.entries())
+        .map(([week, total]) => ({
+            name: `Semana ${week}`,
+            total: Math.round(total)
+        }))
+        .sort((a, b) => {
+            const weekA = parseInt(a.name.split(' ')[1]);
+            const weekB = parseInt(b.name.split(' ')[1]);
+            return weekA - weekB;
+        });
 
     return (
         <div className="min-h-screen bg-background">
@@ -22,7 +72,13 @@ export default async function DashboardPage() {
                     </p>
                 </div>
 
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {/* Volume Chart - Prominent at top */}
+                <div className="mb-8">
+                    <VolumeChart data={volumeData} />
+                </div>
+
+                {/* Action Cards Grid */}
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                     <Card>
                         <CardHeader>
                             <CardTitle>1RM Management</CardTitle>

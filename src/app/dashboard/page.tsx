@@ -60,7 +60,7 @@ export default async function DashboardPage() {
                         </CardHeader>
                         <CardContent>
                             <Button asChild className="w-full" variant="outline">
-                                <Link href="/history">View History</Link>
+                                <Link href="/dashboard/history">View History</Link>
                             </Button>
                         </CardContent>
                     </Card>

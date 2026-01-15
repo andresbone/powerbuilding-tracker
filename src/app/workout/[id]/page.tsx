@@ -94,7 +94,7 @@ export default async function WorkoutPage({ params }: PageProps) {
                             {template.name}
                         </h1>
                         <p className="text-muted-foreground">
-                            {template.programs.name} - Semana {template.week_num}, Día {template.day_num}
+                            {(template.programs as any)?.name || 'Programa'} - Semana {template.week_num}, Día {template.day_num}
                         </p>
                     </div>
                 </div>

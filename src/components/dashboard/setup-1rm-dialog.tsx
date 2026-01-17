@@ -45,30 +45,41 @@ export function Setup1RMDialog({ open, onOpenChange, exercises, onComplete }: Se
         startTransition(async () => {
             try {
                 // Get user ID
-                const { data: { user } } = await supabase.auth.getUser();
+                const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-                if (!user) {
+                if (userError || !user) {
                     throw new Error('No user found');
                 }
 
-                // Prepare upsert data
-                const upsertData = exercises.map(ex => ({
-                    user_id: user.id,
-                    exercise_id: ex.id,
-                    weight_kg: parseFloat(formData[ex.id]),
-                    date_achieved: new Date().toISOString(),
-                }));
+                // Prepare upsert data with validation
+                const upsertData = exercises.map(ex => {
+                    const weight = parseFloat(formData[ex.id]);
+                    if (isNaN(weight) || weight <= 0) {
+                        throw new Error(`Invalid weight for ${ex.name}`);
+                    }
+                    return {
+                        user_id: user.id,
+                        exercise_id: ex.id,
+                        weight_kg: weight,
+                    };
+                });
+
+                console.log('Upserting data:', upsertData);
 
                 // Upsert 1RMs directly
-                const { error } = await supabase
+                const { data, error } = await supabase
                     .from('user_1rms')
                     .upsert(upsertData, {
                         onConflict: 'user_id,exercise_id',
-                    });
+                    })
+                    .select();
 
                 if (error) {
+                    console.error('Supabase error:', error);
                     throw error;
                 }
+
+                console.log('Successfully saved:', data);
 
                 toast.success('¡1RMs Guardados!', {
                     description: 'Ahora puedes comenzar tu entrenamiento',
@@ -79,10 +90,10 @@ export function Setup1RMDialog({ open, onOpenChange, exercises, onComplete }: Se
 
                 // Call onComplete callback
                 onComplete();
-            } catch (error) {
+            } catch (error: any) {
                 console.error('Error saving 1RMs:', error);
                 toast.error('Error al guardar', {
-                    description: 'Intenta nuevamente',
+                    description: error.message || 'Intenta nuevamente',
                 });
             }
         });

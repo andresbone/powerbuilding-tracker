@@ -14,6 +14,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Sparkles } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { useRouter } from 'next/navigation';
 
 interface Setup1RMDialogProps {
     open: boolean;
@@ -25,6 +27,8 @@ interface Setup1RMDialogProps {
 export function Setup1RMDialog({ open, onOpenChange, exercises, onComplete }: Setup1RMDialogProps) {
     const [isPending, startTransition] = useTransition();
     const [formData, setFormData] = useState<Record<string, string>>({});
+    const supabase = createClient();
+    const router = useRouter();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -40,27 +44,43 @@ export function Setup1RMDialog({ open, onOpenChange, exercises, onComplete }: Se
 
         startTransition(async () => {
             try {
-                const response = await fetch('/api/1rms/setup', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        data: exercises.map(ex => ({
-                            exercise_id: ex.id,
-                            weight_kg: parseFloat(formData[ex.id]),
-                        })),
-                    }),
-                });
+                // Get user ID
+                const { data: { user } } = await supabase.auth.getUser();
 
-                if (!response.ok) {
-                    throw new Error('Failed to save 1RMs');
+                if (!user) {
+                    throw new Error('No user found');
+                }
+
+                // Prepare upsert data
+                const upsertData = exercises.map(ex => ({
+                    user_id: user.id,
+                    exercise_id: ex.id,
+                    weight_kg: parseFloat(formData[ex.id]),
+                    date_achieved: new Date().toISOString(),
+                }));
+
+                // Upsert 1RMs directly
+                const { error } = await supabase
+                    .from('user_1rms')
+                    .upsert(upsertData, {
+                        onConflict: 'user_id,exercise_id',
+                    });
+
+                if (error) {
+                    throw error;
                 }
 
                 toast.success('¡1RMs Guardados!', {
                     description: 'Ahora puedes comenzar tu entrenamiento',
                 });
 
+                // Refresh the page to update data
+                router.refresh();
+
+                // Call onComplete callback
                 onComplete();
             } catch (error) {
+                console.error('Error saving 1RMs:', error);
                 toast.error('Error al guardar', {
                     description: 'Intenta nuevamente',
                 });

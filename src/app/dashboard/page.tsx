@@ -4,10 +4,22 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { VolumeChart } from '@/components/dashboard/volume-chart';
+import { StrengthChart } from '@/components/dashboard/strength-chart';
+import { AnalyticsCarousel } from '@/components/dashboard/analytics-carousel';
+import { SignOutButton } from '@/components/auth/sign-out-button';
+import { DashboardOnboarding } from '@/components/dashboard/dashboard-onboarding';
+import { getDailyPerformance } from '@/lib/logic/smart-coach';
+import { format } from 'date-fns';
 
 interface VolumeData {
-    name: string;
+    date: string;
     total: number;
+}
+
+interface StrengthDataPoint {
+    date: string;
+    historical: number | null;
+    daily: number | null;
 }
 
 export default async function DashboardPage() {
@@ -18,63 +30,161 @@ export default async function DashboardPage() {
         redirect('/login');
     }
 
+    // Check for onboarding: Fetch main lifts and user's 1RMs
+    const mainLiftsNames = ["Back Squat", "Barbell Bench Press", "Deadlift", "Overhead Press"];
+    const { data: mainLiftsExercises } = await supabase
+        .from('exercises')
+        .select('id, name')
+        .in('name', mainLiftsNames);
+
+    const { data: onboarding1RMs } = await supabase
+        .from('user_1rms')
+        .select('exercise_id')
+        .eq('user_id', user.id)
+        .in('exercise_id', (mainLiftsExercises || []).map(e => e.id));
+
+    // Determine which main lifts are missing
+    const onboarding1RMSet = new Set((onboarding1RMs || []).map(rm => rm.exercise_id));
+    const missingExercises = (mainLiftsExercises || [])
+        .filter(ex => !onboarding1RMSet.has(ex.id))
+        .map(ex => ({ id: ex.id, name: ex.name }));
+
+    const shouldShowOnboarding = missingExercises.length > 0;
+
+
     // Fetch workout logs with set_logs and templates for volume calculation
     const { data: workoutLogs } = await supabase
         .from('workout_logs')
         .select(`
             id,
+            started_at,
             workout_templates (
                 week_num
             ),
             set_logs (
                 weight_kg,
-                reps_performed
+                reps_performed,
+                rpe_actual,
+                exercise_id,
+                created_at
             )
         `)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .order('started_at', { ascending: true });
 
-    // Calculate weekly volume
-    const weeklyVolumeMap = new Map<number, number>();
+    // Calculate volume by date
+    const volumeByDate = new Map<string, number>();
 
     workoutLogs?.forEach((log: any) => {
-        const weekNum = log.workout_templates?.week_num;
-        if (!weekNum) return;
+        const date = log.started_at;
+        if (!date) return;
 
         // Calculate volume for this workout
         const workoutVolume = log.set_logs?.reduce((sum: number, set: any) => {
             return sum + (set.weight_kg * set.reps_performed);
         }, 0) || 0;
 
-        // Add to weekly total
-        const currentTotal = weeklyVolumeMap.get(weekNum) || 0;
-        weeklyVolumeMap.set(weekNum, currentTotal + workoutVolume);
+        // Add to date total
+        const currentTotal = volumeByDate.get(date) || 0;
+        volumeByDate.set(date, currentTotal + workoutVolume);
     });
 
-    // Convert to array and sort by week
-    const volumeData: VolumeData[] = Array.from(weeklyVolumeMap.entries())
-        .map(([week, total]) => ({
-            name: `Semana ${week}`,
+    // Convert to array with dates
+    const volumeData: VolumeData[] = Array.from(volumeByDate.entries())
+        .map(([date, total]) => ({
+            date,
             total: Math.round(total)
         }))
-        .sort((a, b) => {
-            const weekA = parseInt(a.name.split(' ')[1]);
-            const weekB = parseInt(b.name.split(' ')[1]);
-            return weekA - weekB;
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Fetch user's 1RMs for strength chart
+    const { data: user1RMs } = await supabase
+        .from('user_1rms')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: true });
+
+    // Calculate strength progression data
+    // For simplicity, we'll focus on the main compound lifts
+    const strengthData: StrengthDataPoint[] = [];
+
+    // Get unique dates from workout logs
+    const workoutDates = new Map<string, any[]>();
+    workoutLogs?.forEach((log: any) => {
+        const date = format(new Date(log.started_at), 'MMM dd');
+        if (!workoutDates.has(date)) {
+            workoutDates.set(date, []);
+        }
+        workoutDates.get(date)?.push(log);
+    });
+
+    // For each date, calculate the best daily estimated 1RM
+    Array.from(workoutDates.entries()).forEach(([date, logs]) => {
+        let maxDaily = 0;
+
+        logs.forEach((log: any) => {
+            log.set_logs?.forEach((set: any) => {
+                if (set.rpe_actual && set.weight_kg && set.reps_performed) {
+                    const daily = getDailyPerformance(
+                        set.weight_kg,
+                        set.reps_performed,
+                        set.rpe_actual
+                    );
+                    if (daily > maxDaily) {
+                        maxDaily = daily;
+                    }
+                }
+            });
         });
+
+        strengthData.push({
+            date,
+            historical: null,
+            daily: maxDaily > 0 ? maxDaily : null,
+        });
+    });
+
+    // Add historical 1RM data points
+    user1RMs?.forEach((rm: any) => {
+        const date = format(new Date(rm.updated_at), 'MMM dd');
+        const existing = strengthData.find(d => d.date === date);
+        if (existing) {
+            existing.historical = rm.weight_kg;
+        } else {
+            strengthData.push({
+                date,
+                historical: rm.weight_kg,
+                daily: null,
+            });
+        }
+    });
+
+    // Sort by date
+    strengthData.sort((a, b) => {
+        const dateA = new Date(a.date + ' 2024');
+        const dateB = new Date(b.date + ' 2024');
+        return dateA.getTime() - dateB.getTime();
+    });
 
     return (
         <div className="min-h-screen bg-background">
             <div className="container mx-auto px-4 py-8">
                 <div className="mb-8">
-                    <h1 className="text-3xl font-bold tracking-tight mb-2">Dashboard</h1>
+                    <div className="flex items-center justify-between mb-2">
+                        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+                        <SignOutButton />
+                    </div>
                     <p className="text-muted-foreground">
                         Welcome back, {user.email}
                     </p>
                 </div>
 
-                {/* Volume Chart - Prominent at top */}
+                {/* Analytics Carousel */}
                 <div className="mb-8">
-                    <VolumeChart data={volumeData} />
+                    <AnalyticsCarousel
+                        volumeData={volumeData}
+                        strengthData={strengthData}
+                    />
                 </div>
 
                 {/* Action Cards Grid */}
@@ -135,6 +245,12 @@ export default async function DashboardPage() {
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* Onboarding Dialog */}
+                <DashboardOnboarding
+                    shouldShowOnboarding={shouldShowOnboarding}
+                    missingExercises={missingExercises}
+                />
             </div>
         </div>
     );

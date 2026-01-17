@@ -100,19 +100,36 @@ export default async function OneRMPage() {
                     <h1 className="text-3xl font-bold tracking-tight mb-2">
                         Gestión de 1RMs
                     </h1>
-                    <p className="text-muted-foreground">
+                    <p className="text-muted-foreground mb-3">
                         Actualiza tus máximos de una repetición para cada ejercicio
                     </p>
+                    <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+                        <p className="text-sm text-foreground">
+                            💡 <strong>Mantén estos números actualizados.</strong> Si subes tu 1RM aquí, todas tus futuras rutinas se recalcularán automáticamente con pesos más desafiantes.
+                        </p>
+                    </div>
                 </div>
 
                 <div className="space-y-4">
-                    {exercises.map((exercise: Exercise) => (
-                        <ExerciseCard
-                            key={exercise.id}
-                            exercise={exercise}
-                            current1RM={oneRMMap.get(exercise.id)}
-                        />
-                    ))}
+                    {exercises
+                        .filter((exercise: Exercise) => {
+                            // Only show the 4 main powerbuilding lifts
+                            const mainLifts = [
+                                "Back Squat",
+                                "Barbell Bench Press",
+                                "Deadlift",
+                                "Overhead Press"
+                            ];
+                            return mainLifts.includes(exercise.name);
+                        })
+                        .map((exercise: Exercise) => (
+                            <ExerciseCard
+                                key={exercise.id}
+                                exercise={exercise}
+                                current1RM={oneRMMap.get(exercise.id)}
+                            />
+                        ))
+                    }
                 </div>
 
                 {exercises.length === 0 && (

@@ -12,10 +12,10 @@ export default async function Home() {
       <main className="container mx-auto px-4 py-8">
         <div className="text-center space-y-6">
           <h1 className="text-4xl font-bold tracking-tight mb-4">
-            Powerbuilding Tracker
+            Martes
           </h1>
           <p className="text-muted-foreground text-lg">
-            Track your powerbuilding workouts based on Jeff Nippard&apos;s system
+            Tu compañero de entrenamiento inteligente. Registra, analiza y mejora tu fuerza con sobrecarga progresiva automatizada.
           </p>
 
           {user ? (

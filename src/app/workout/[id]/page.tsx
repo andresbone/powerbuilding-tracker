@@ -2,6 +2,7 @@ import { createServerClient } from '@/lib/supabase';
 import { redirect, notFound } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { WorkoutSession } from '@/components/workout-session';
+import { RestTimer } from '@/components/workout/rest-timer';
 import Link from 'next/link';
 import type { TemplateExerciseWithExercise } from '@/lib/supabase/types';
 
@@ -114,6 +115,9 @@ export default async function WorkoutPage({ params }: PageProps) {
                     />
                 )}
             </div>
+
+            {/* Rest Timer - Always visible during workout */}
+            <RestTimer />
         </div>
     );
 }

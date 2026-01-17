@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { finishWorkout } from '@/app/actions/workout';
+import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
+import { WorkoutHeader } from '@/components/workout/workout-header';
 import type { TemplateExerciseWithExercise, User1RM } from '@/lib/supabase/types';
 
 interface WorkoutSessionProps {
@@ -65,6 +67,23 @@ export function WorkoutSession({ templateExercises, user1RMs, templateName, temp
 
         return initialSets;
     });
+
+    // Track if there are unsaved changes (sets with data but not completed)
+    const hasUnsavedChanges = useMemo(() => {
+        for (const sets of exerciseSets.values()) {
+            for (const set of sets) {
+                // If set has data entered but not marked as completed, it's unsaved
+                const hasData = set.weight !== '' || set.reps !== '' || set.rpe !== '';
+                if (hasData && !set.completed) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }, [exerciseSets]);
+
+    // Use unsaved changes hook
+    useUnsavedChanges(hasUnsavedChanges);
 
     const updateSet = (exerciseId: string, setIndex: number, field: keyof SetData, value: string | boolean) => {
         setExerciseSets((prev) => {
@@ -131,8 +150,11 @@ export function WorkoutSession({ templateExercises, user1RMs, templateName, temp
 
     return (
         <div className="space-y-6">
-            <div className="sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10 pb-4 border-b">
-                <h2 className="text-2xl font-bold">{templateName}</h2>
+            {/* Workout Header with Exit Button */}
+            <WorkoutHeader hasUnsavedChanges={hasUnsavedChanges} />
+
+            <div className="px-4">
+                <h2 className="text-2xl font-bold mb-1">{templateName}</h2>
                 <p className="text-sm text-muted-foreground">
                     {templateExercises.length} ejercicios
                 </p>
@@ -174,74 +196,84 @@ export function WorkoutSession({ templateExercises, user1RMs, templateName, temp
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-3">
-                                {sets.map((set, setIndex) => (
-                                    <div
-                                        key={setIndex}
-                                        className={`grid grid-cols-[auto_1fr_1fr_1fr_auto] gap-2 items-center p-3 rounded-lg border ${set.completed ? 'bg-muted/50 border-primary' : 'bg-background'
-                                            }`}
-                                    >
-                                        <div className="text-sm font-medium text-muted-foreground w-8">
-                                            {set.setNum}
-                                        </div>
+                                {sets.map((set, setIndex) => {
+                                    // Check if this set has unsaved data
+                                    const hasData = set.weight !== '' || set.reps !== '' || set.rpe !== '';
+                                    const isUnsaved = hasData && !set.completed;
 
-                                        <div className="space-y-1">
-                                            <Label htmlFor={`weight-${te.id}-${setIndex}`} className="text-xs">
-                                                Kg
-                                            </Label>
-                                            <Input
-                                                id={`weight-${te.id}-${setIndex}`}
-                                                type="number"
-                                                inputMode="decimal"
-                                                step="0.5"
-                                                value={set.weight}
-                                                onChange={(e) => updateSet(te.id, setIndex, 'weight', e.target.value)}
-                                                className="h-10 text-center font-bold"
-                                                disabled={set.completed}
+                                    return (
+                                        <div
+                                            key={setIndex}
+                                            className={`grid grid-cols-[auto_1fr_1fr_1fr_auto] gap-2 items-center p-3 rounded-lg border ${set.completed
+                                                ? 'bg-muted/50 border-primary'
+                                                : isUnsaved
+                                                    ? 'bg-background border-orange-500 border-2'
+                                                    : 'bg-background'
+                                                }`}
+                                        >
+                                            <div className="text-sm font-medium text-muted-foreground w-8">
+                                                {set.setNum}
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <Label htmlFor={`weight-${te.id}-${setIndex}`} className="text-xs">
+                                                    Kg
+                                                </Label>
+                                                <Input
+                                                    id={`weight-${te.id}-${setIndex}`}
+                                                    type="number"
+                                                    inputMode="decimal"
+                                                    step="0.5"
+                                                    value={set.weight}
+                                                    onChange={(e) => updateSet(te.id, setIndex, 'weight', e.target.value)}
+                                                    className="h-10 text-center font-bold"
+                                                    disabled={set.completed}
+                                                />
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <Label htmlFor={`reps-${te.id}-${setIndex}`} className="text-xs">
+                                                    Reps
+                                                </Label>
+                                                <Input
+                                                    id={`reps-${te.id}-${setIndex}`}
+                                                    type="number"
+                                                    inputMode="numeric"
+                                                    value={set.reps}
+                                                    onChange={(e) => updateSet(te.id, setIndex, 'reps', e.target.value)}
+                                                    className="h-10 text-center font-bold"
+                                                    disabled={set.completed}
+                                                />
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <Label htmlFor={`rpe-${te.id}-${setIndex}`} className="text-xs">
+                                                    RPE
+                                                </Label>
+                                                <Input
+                                                    id={`rpe-${te.id}-${setIndex}`}
+                                                    type="number"
+                                                    inputMode="decimal"
+                                                    step="0.5"
+                                                    min="0"
+                                                    max="10"
+                                                    value={set.rpe}
+                                                    onChange={(e) => updateSet(te.id, setIndex, 'rpe', e.target.value)}
+                                                    className="h-10 text-center font-bold"
+                                                    disabled={set.completed}
+                                                />
+                                            </div>
+
+                                            <Checkbox
+                                                checked={set.completed}
+                                                onCheckedChange={(checked) =>
+                                                    updateSet(te.id, setIndex, 'completed', checked as boolean)
+                                                }
+                                                className="h-6 w-6"
                                             />
                                         </div>
-
-                                        <div className="space-y-1">
-                                            <Label htmlFor={`reps-${te.id}-${setIndex}`} className="text-xs">
-                                                Reps
-                                            </Label>
-                                            <Input
-                                                id={`reps-${te.id}-${setIndex}`}
-                                                type="number"
-                                                inputMode="numeric"
-                                                value={set.reps}
-                                                onChange={(e) => updateSet(te.id, setIndex, 'reps', e.target.value)}
-                                                className="h-10 text-center font-bold"
-                                                disabled={set.completed}
-                                            />
-                                        </div>
-
-                                        <div className="space-y-1">
-                                            <Label htmlFor={`rpe-${te.id}-${setIndex}`} className="text-xs">
-                                                RPE
-                                            </Label>
-                                            <Input
-                                                id={`rpe-${te.id}-${setIndex}`}
-                                                type="number"
-                                                inputMode="decimal"
-                                                step="0.5"
-                                                min="0"
-                                                max="10"
-                                                value={set.rpe}
-                                                onChange={(e) => updateSet(te.id, setIndex, 'rpe', e.target.value)}
-                                                className="h-10 text-center font-bold"
-                                                disabled={set.completed}
-                                            />
-                                        </div>
-
-                                        <Checkbox
-                                            checked={set.completed}
-                                            onCheckedChange={(checked) =>
-                                                updateSet(te.id, setIndex, 'completed', checked as boolean)
-                                            }
-                                            className="h-6 w-6"
-                                        />
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </CardContent>
                     </Card>

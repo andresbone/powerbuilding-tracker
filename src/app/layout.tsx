@@ -14,8 +14,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Powerbuilding Tracker",
-  description: "Track your powerbuilding workouts based on Jeff Nippard's system",
+  title: "Martes",
+  description: "Your intelligent powerbuilding training companion with smart coaching and analytics",
+  appleWebApp: {
+    title: "Martes",
+    statusBarStyle: "default",
+  },
 };
 
 export default function RootLayout({

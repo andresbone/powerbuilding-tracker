@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { login, signup } from '@/app/actions/auth';
+import Link from 'next/link';
 
 export default function LoginPage() {
     const router = useRouter();
@@ -96,6 +97,14 @@ export default function LoginPage() {
                                 >
                                     {isPending ? 'Logging in...' : 'Login'}
                                 </Button>
+                                <div className="text-center">
+                                    <Link
+                                        href="/forgot-password"
+                                        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                                    >
+                                        ¿Olvidaste tu contraseña?
+                                    </Link>
+                                </div>
                             </form>
                         </TabsContent>
 

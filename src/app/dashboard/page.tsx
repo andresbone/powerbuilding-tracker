@@ -51,6 +51,9 @@ export default async function DashboardPage() {
 
     const shouldShowOnboarding = missingExercises.length > 0;
 
+    // Admin access control
+    const isAdmin = user?.email === "andresbbone@gmail.com";
+
 
     // Fetch workout logs with set_logs and templates for volume calculation
     const { data: workoutLogs } = await supabase
@@ -188,7 +191,7 @@ export default async function DashboardPage() {
                 </div>
 
                 {/* Action Cards Grid */}
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                <div className={`grid gap-6 md:grid-cols-2 ${isAdmin ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
                     <Card>
                         <CardHeader>
                             <CardTitle>1RM Management</CardTitle>
@@ -231,19 +234,21 @@ export default async function DashboardPage() {
                         </CardContent>
                     </Card>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Admin Panel</CardTitle>
-                            <CardDescription>
-                                Database seeding and management tools
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Button asChild className="w-full" variant="secondary">
-                                <Link href="/dashboard/admin">Admin Tools</Link>
-                            </Button>
-                        </CardContent>
-                    </Card>
+                    {isAdmin && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Admin Panel</CardTitle>
+                                <CardDescription>
+                                    Database seeding and management tools
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <Button asChild className="w-full" variant="secondary">
+                                    <Link href="/dashboard/admin">Admin Tools</Link>
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
 
                 {/* Onboarding Dialog */}
